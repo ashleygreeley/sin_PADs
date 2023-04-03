@@ -12,6 +12,7 @@ import datetime
 import pathlib
 from os.path import exists
 from scipy.special import legendre
+import pathlib
 
 import sin_PADs
 from sin_PADs import config
@@ -19,7 +20,7 @@ import sin_PADs.fit_funcs
 from sin_PADs.read_ephem import readephemdata
 #sudo python setup.py install
 #sudo python -m sin_PADs config
-def load_data(sc_id, day,instrument,rewrite):
+def load_data(sc_id, day,instrument,rewrite,**kwargs):
     """
 
     Parameters
@@ -37,8 +38,20 @@ def load_data(sc_id, day,instrument,rewrite):
     -------
     sc_id = 'A'
     day = '2020-01-01'
+    release= rel03 or rel04. If none, rel04 assumed
     """
-
+    
+    rel = kwargs.get('release', None)
+    if rel=='rel04' or rel==None:
+        rel='rel04'
+    elif rel=='rel03':
+        rel='rel03'
+    else:
+        print('release number not in proper form, rel04 assumed for mageis and rel03 for rept')
+        if instrument=='mageis':
+            rel='rel04'
+        if instrument=='rept':
+            rel='rel03'
     ephemDir=sin_PADs.project_data_dir+'/RBSP'
     RBSPDir=sin_PADs.project_data_dir+'/RBSP'
 
@@ -49,16 +62,34 @@ def load_data(sc_id, day,instrument,rewrite):
 
 
     print(RBSPDir)
-
+    file_matchL2=instrument+'/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect-'+instrument+'*2_'+str(yr)+mo+day+'_v*.cdf'
+    local_filesL2 = list(pathlib.Path(RBSPDir).rglob(file_matchL2))
+    
+    file_matchL3=instrument+'/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect-'+instrument+'*3'+str(yr)+mo+day+'_v*.cdf'
+    local_filesL3 = list(pathlib.Path(RBSPDir).rglob(file_matchL3))
+    
     if instrument=='rept':
-        print(RBSPDir+'/rept/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*2_'+str(yr)+mo+day+'_v*.cdf')
-        L2files=glob.glob(RBSPDir+'/rept/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*2_'+str(yr)+mo+day+'_v*.cdf')
+    #    #print(RBSPDir+'/rept/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*2_'+str(yr)+mo+day+'_v*.cdf')
+    #    L2files=glob.glob(RBSPDir+'/rept/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*2_'+str(yr)+mo+day+'_v*.cdf')
         L3files=glob.glob(RBSPDir+'/rept/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*3_'+str(yr)+mo+day+'_v*.cdf')
     if instrument=='mageis':
-        L2files=glob.glob(RBSPDir+'/mageis/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel0*_ect-mageis-*2_'+str(yr)+str(mo)+str(day)+'_v*.cdf')
+    #    L2files=glob.glob(RBSPDir+'/mageis/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel0*_ect-mageis-*2_'+str(yr)+str(mo)+str(day)+'_v*.cdf')
         L3files=glob.glob(RBSPDir+'/mageis/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_rel0*_ect-mageis-*3_'+str(yr)+mo+day+'_v*.cdf')
-    L2 = pycdf.CDF(L2files[0])
+    if len(local_filesL2) in [1, 2]:
+        L2 = pycdf.CDF(local_filesL2[0])
+    elif len(local_filesL2) == 0:
+        downloader = sin_PADs.Downloader(
+                f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l2/ect/{instrument}/sectors/{rel}/{yr}',
+                download_dir=RBSPDir / instrument / 'L2'
+                )
+        matched_downloaders = downloader.ls(match=file_matchL2)
+        file_path = matched_downloaders[0].download() 
+        L2=pycdf.CDF(file_path)
+        
+    
+    
     L3 = pycdf.CDF(L3files[0])
+    
 
     print(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
 

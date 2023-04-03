@@ -23,3 +23,5 @@ if 'Paths' in settings:
             'Did you run "python3 -m package config"?')
 
     config = {'project_dir': project_dir, 'project_data_dir': project_data_dir}
+
+from sin_PADs.downloader import Downloader
