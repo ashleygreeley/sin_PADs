@@ -16,6 +16,11 @@ import pathlib
 
 import sin_PADs
 from sin_PADs import config
+
+from typing import Union
+import pathlib
+import zipfile
+
 import sin_PADs.fit_funcs
 from sin_PADs.read_ephem import readephemdata
 #sudo python setup.py install
@@ -40,7 +45,7 @@ def load_data(sc_id, day,instrument,rewrite,**kwargs):
     day = '2020-01-01'
     release= rel03 or rel04. If none, rel04 assumed
     """
-    
+
     rel = kwargs.get('release', None)
     if rel=='rel04' or rel==None:
         rel='rel04'
@@ -61,52 +66,80 @@ def load_data(sc_id, day,instrument,rewrite,**kwargs):
     day=f'{d1.day:02d}'
 
 
-    print(RBSPDir)
-    file_matchL2=instrument+'/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect-'+instrument+'*2_'+str(yr)+mo+day+'_v*.cdf'
-    local_filesL2 = list(pathlib.Path(RBSPDir).rglob(file_matchL2))
-    
-    file_matchL3=instrument+'/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect-'+instrument+'*3'+str(yr)+mo+day+'_v*.cdf'
-    local_filesL3 = list(pathlib.Path(RBSPDir).rglob(file_matchL3))
-    
-    if instrument=='rept':
+    #print(RBSPDir)
+    file_matchL2='rbsp'+sc_id.lower()+'_'+rel+'_ect-'+instrument+'*2_'+str(yr)+mo+day+'_v*.cdf'
+    file_matchL3='rbsp'+sc_id.lower()+'_'+rel+'_ect-'+instrument+'*3_'+str(yr)+mo+day+'_v*.cdf'
+    #print(file_matchL2)
+    #print(pathlib.Path(RBSPDir+'/'+instrument+'/L2/'+sc_id+'/'))
+    #local_filesL2 = list(pathlib.Path(RBSPDir+'/'+instrument+'/L2/'+sc_id+'/').rglob(file_matchL2))
+    local_filesL2=glob.glob(RBSPDir+'/'+instrument+'/L2/'+sc_id+'/'+file_matchL2)
+    local_filesL3=glob.glob(RBSPDir+'/'+instrument+'/L3/'+sc_id+'/'+file_matchL3)
+
+    #print(local_filesL2)
+
+
+
+    #if instrument=='rept':
     #    #print(RBSPDir+'/rept/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*2_'+str(yr)+mo+day+'_v*.cdf')
     #    L2files=glob.glob(RBSPDir+'/rept/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*2_'+str(yr)+mo+day+'_v*.cdf')
-        L3files=glob.glob(RBSPDir+'/rept/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*3_'+str(yr)+mo+day+'_v*.cdf')
-    if instrument=='mageis':
+    #    L3files=glob.glob(RBSPDir+'/rept/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*3_'+str(yr)+mo+day+'_v*.cdf')
+    #if instrument=='mageis':
     #    L2files=glob.glob(RBSPDir+'/mageis/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel0*_ect-mageis-*2_'+str(yr)+str(mo)+str(day)+'_v*.cdf')
-        L3files=glob.glob(RBSPDir+'/mageis/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_rel0*_ect-mageis-*3_'+str(yr)+mo+day+'_v*.cdf')
+    #    L3files=glob.glob(RBSPDir+'/mageis/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_rel0*_ect-mageis-*3_'+str(yr)+mo+day+'_v*.cdf')
     if len(local_filesL2) in [1, 2]:
+        print('1 or 2')
         L2 = pycdf.CDF(local_filesL2[0])
     elif len(local_filesL2) == 0:
+        print('0')
+        print(f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l2/ect/{instrument}/sectors/{rel}/{yr}/')
         downloader = sin_PADs.Downloader(
-                f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l2/ect/{instrument}/sectors/{rel}/{yr}',
-                download_dir=RBSPDir / instrument / 'L2'
+                f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l2/ect/{instrument}/sectors/{rel}/{yr}/',
+                download_dir=RBSPDir+'/'+instrument+'/L2/'+sc_id
                 )
+
         matched_downloaders = downloader.ls(match=file_matchL2)
-        file_path = matched_downloaders[0].download() 
-        L2=pycdf.CDF(file_path)
-        
-    
-    
-    L3 = pycdf.CDF(L3files[0])
-    
+        file_path = matched_downloaders[0].download(stream='True')
+        L2=pycdf.CDF(str(file_path))
 
-    print(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
+    if len(local_filesL3) in [1, 2]:
+        print('1 or 2')
+        L3 = pycdf.CDF(local_filesL3[0])
+    elif len(local_filesL3) == 0:
+        print('0')
+        print(f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l2/ect/{instrument}/sectors/{rel}/{yr}/')
+        downloader = sin_PADs.Downloader(
+                f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l3/ect/{instrument}/sectors/{rel}/{yr}/',
+                download_dir=RBSPDir+'/'+instrument+'/L3/'+sc_id
+                )
 
-    file_exists=exists(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
+        matched_downloaders = downloader.ls(match=file_matchL3)
+        file_path = matched_downloaders[0].download(stream='True')
+        L3=pycdf.CDF(str(file_path))
+
+
+    #L3 = pycdf.CDF(L3files[0])
+
+
+    print(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
+
+    file_exists=exists(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
 
     if ((file_exists)&(rewrite=='yes')):
         print('overwriting cdf')
-        os.remove(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
-        fit_data(L2,L3,sc_id,yr,mo,day,instrument)
-    if ((file_exists==False)):
-        fit_data(L2,L3,sc_id,yr,mo,day,instrument)
-    if ((file_exists)&(rewrite=='no')):
+        os.remove(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
+        fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel)
+    elif ((file_exists==False)):
+        print('write new cdf')
+        fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel)
+    elif ((file_exists)&(rewrite=='no')):
         print('Skipping this one')
+        pass
+    else:
+        print('was there a weird option?')
         pass
 
 
-def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
+def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
 
     xxA=[pyind.timetuple().tm_yday+float(pyind.strftime("%H"))/24.+float(pyind.strftime("%M"))/1400.+float(pyind.strftime("%S"))/86400. for pyind in L3['Epoch']]
     ephem=readephemdata(sc_id.lower(),yr,mo,day)
@@ -119,13 +152,17 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
         L3alpha=L3['FEDU_Unbinned_Alpha'][:] #[7000,36]
         L3alphaindex=L3['FEDU_Unbinned_Alpha'][0,:]
         L3fedu=L3['FEDU_Unbinned_0to180']
+        L3fpdu=L3['FPDU_Unbinned_0to180']
         L3energy=L3['FEDU_Energy'][:]
     if instrument=='mageis':
         L3time=L3['Epoch'][:]
         L3alpha=L3['FEDU_Alpha'][:] #[11]
         L3alphaindex=L3['FEDU_Alpha'][:]
         L3fedu=L3['FEDU']
-        L3energy=L3['FEDU_Energy'][:] #1820
+        if rel=='rel04':
+            L3energy=L3['FEDU_Energy'][:] #1820
+        elif rel=='rel03':
+            L3energy=L3['FEDU_Energy'][0,:] #1820
 
 
     eq_pitch=sin_PADs.fit_funcs.pitchangle_func(L3alpha.astype('float'),L3['B_Eq'][:],L3['B_Calc'][:],instrument)
@@ -138,6 +175,7 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
     l_fit_arr=np.nan*np.ones((len(L3time),len(L3alphaindex),len(L3energy)), dtype=float);
     butt_arr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
     PAIndex_arr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
+    PAIndex_arr_protons=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
     fit_arr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
     fit_arr_atbinned=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
     cn=np.nan*np.ones((len(L3time),len(L3energy),5), dtype=float);
@@ -153,14 +191,21 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
             xfit1=eq_pitch[tim]
             yfit1=L3fedu[tim,:,en]
 
+
             xfit2=np.abs(xfit1-180)
             yfit2=yfit1
 
             xfittot=np.append(xfit1,xfit2)
             yfittot=np.append(yfit1,yfit2)
 
+            if en<8:
+                yfit1_protons=L3fedu[tim,:,en]
+                yfittot_protons=np.append(yfit1_protons,yfit1_protons)
+                fitparams_eq_protons=sin_PADs.fit_funcs.curvetest(xfittot,yfittot);
+                PAIndex_arr_protons[tim,en]=fitparams_eq_protons[1]
 
             fitparams_eq=sin_PADs.fit_funcs.curvetest(xfittot,yfittot);
+
             #closest PA to 90
             maxlo=max(xfittot[xfittot<90]);
 
@@ -174,6 +219,7 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
             fit_arr[tim,en]=fitparams_eq[0]
             #b
             PAIndex_arr[tim,en]=fitparams_eq[1]
+
 
             if len(xfittot[(yfittot>0)&(xfittot>0)]) > 3:
                 cc=np.polynomial.legendre.legfit(np.cos(np.array(xfittot[(yfittot>0)&(xfittot>0)])*np.pi/180.),yfittot[(yfittot>0)&(xfittot>0)],4)
@@ -203,7 +249,7 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
             maxloarr[tim,en]=maxlo
 
     print('Writing to cdf')
-    cdf2 = pycdf.CDF(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf', '')
+    cdf2 = pycdf.CDF(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf', '')
 
     #Depend, time
     cdf2['Epoch']=L3['Epoch'][:]
@@ -221,6 +267,18 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
     cdf2['Energy'].attrs['FORMAT']='E12.2'
     cdf2['Energy'].attrs['LABLAXIS']='Energy'
     cdf2['Energy'].attrs['SCALETYP']='log'
+    if ((instrument=='mageis')& (rel=='rel03')):
+        cdf2['Energy'].attrs['DEPEND_0']='Epoch'
+
+    cdf2['Energy_Protons']=L3['FPDU_Energy'][:]
+    cdf2['Energy_Protons'].attrs['FIELDNAM']='Energy'
+    cdf2['Energy_Protons'].attrs['CATDESC']='Energy bins from FPDU'
+    cdf2['Energy_Protons'].attrs['FILLVAL']=-1e+31
+    cdf2['Energy_Protons'].attrs['VALIDMIN']=0.0
+    cdf2['Energy_Protons'].attrs['VALIXMAX']=100.0
+    cdf2['Energy_Protons'].attrs['FORMAT']='E12.2'
+    cdf2['Energy_Protons'].attrs['LABLAXIS']='Energy'
+    cdf2['Energy_Protons'].attrs['SCALETYP']='log'
 
 
 
@@ -230,6 +288,8 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
         cdf2['EnergyMeV'].attrs['VALIDMIN']=0.0
         cdf2['EnergyMeV'].attrs['VALIXMAX']=100.0
         cdf2['EnergyMeV'].attrs['LABLAXIS']='Energy (MeV)'
+        if rel=='rel03':
+            cdf2['EnergyMeV'].attrs['DEPEND_0']='Epoch'
 
         cdf2['FESA_CORR']=L2['FESA_CORR'][:]*1000.
         cdf2['FESA_CORR'].attrs['DEPEND_0']= 'Epoch'
@@ -332,6 +392,17 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
         cdf2['PAIndex'].attrs['DEPEND_1']= 'EnergyMeV'
     if instrument=='rept':
         cdf2['PAIndex'].attrs['DEPEND_1']= 'Energy'
+
+    cdf2['PAIndex_Protons']=PAIndex_arr_protons
+    cdf2['PAIndex_Protons'].attrs['DEPEND_0']= 'Epoch'
+    cdf2['PAIndex_Protons'].attrs['VALIDMIN']=0
+    cdf2['PAIndex_Protons'].attrs['VALIDMAX']=10
+    cdf2['PAIndex_Protons'].attrs['VAR_TYPE']='data'
+    cdf2['PAIndex_Protons'].attrs['DISPLAY_TYPE']='time_series'
+    if instrument=='mageis':
+        cdf2['PAIndex_Protons'].attrs['DEPEND_1']= 'EnergyMeV'
+    if instrument=='rept':
+        cdf2['PAIndex_Protons'].attrs['DEPEND_1']= 'Energy_Protons'
 
     #legendre polynomials
     cdf2['cn']=cn
@@ -525,11 +596,11 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
     cdf2['B_Eq'].attrs['LABLAXIS']='B'
     cdf2['B_Eq'].attrs['VAR_TYPE']='support_data'
 
-    print(type(orbnum[0]))
-    print(np.shape(orbnum))
-    print(L3['Epoch'][0])
+    #print(type(orbnum[0]))
+    #print(np.shape(orbnum))
+    #print(L3['Epoch'][0])
     oo=[np.uint8(ii) for ii in orbnum]
-    print(np.shape(L3['Epoch'][:]))
+    #print(np.shape(L3['Epoch'][:]))
     cdf2['orbit_number']=oo
     cdf2['orbit_number'].attrs['DEPEND_0']= 'Epoch'
     cdf2['orbit_number'].attrs['VAR_TYPE']='support_data'
@@ -557,4 +628,4 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument):
 if __name__ == '__main__':
     sc_id = 'A'
     day = '2019-01-26'
-    path = load_state(sc_id, day)
+    #path = load_state(sc_id, day)

@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import datetime
 import pathlib
 from os.path import exists
+import os.path
 from scipy.special import legendre
 import pathlib
 
@@ -23,9 +24,12 @@ import zipfile
 
 import sin_PADs.fit_funcs
 from sin_PADs.read_ephem import readephemdata
+from sin_PADs.var_init import initiate_variables
+from sin_PADs.var_init import create_arrays
+from sin_PADs.var_init import all_fits
 #sudo python setup.py install
 #sudo python -m sin_PADs config
-def load_data(sc_id, day,instrument,rewrite,**kwargs):
+def load_data(sc_id, day,instrument,rewrite,particle,**kwargs):
     """
 
     Parameters
@@ -45,9 +49,9 @@ def load_data(sc_id, day,instrument,rewrite,**kwargs):
     day = '2020-01-01'
     release= rel03 or rel04. If none, rel04 assumed
     """
-    
-    rel = kwargs.get('release', None)
-    if rel=='rel04' or rel==None:
+
+    rel = kwargs.get('rel', None)
+    if rel=='rel04':
         rel='rel04'
     elif rel=='rel03':
         rel='rel03'
@@ -57,6 +61,13 @@ def load_data(sc_id, day,instrument,rewrite,**kwargs):
             rel='rel04'
         if instrument=='rept':
             rel='rel03'
+
+    legendre = kwargs.get('legendre', None)
+    if legendre=='yes':
+        legendre='yes'
+    else:
+        legenre='no'
+
     ephemDir=sin_PADs.project_data_dir+'/RBSP'
     RBSPDir=sin_PADs.project_data_dir+'/RBSP'
 
@@ -69,73 +80,64 @@ def load_data(sc_id, day,instrument,rewrite,**kwargs):
     #print(RBSPDir)
     file_matchL2='rbsp'+sc_id.lower()+'_'+rel+'_ect-'+instrument+'*2_'+str(yr)+mo+day+'_v*.cdf'
     file_matchL3='rbsp'+sc_id.lower()+'_'+rel+'_ect-'+instrument+'*3_'+str(yr)+mo+day+'_v*.cdf'
-    #print(file_matchL2)
-    #print(pathlib.Path(RBSPDir+'/'+instrument+'/L2/'+sc_id+'/'))
-    #local_filesL2 = list(pathlib.Path(RBSPDir+'/'+instrument+'/L2/'+sc_id+'/').rglob(file_matchL2))
     local_filesL2=glob.glob(RBSPDir+'/'+instrument+'/L2/'+sc_id+'/'+file_matchL2)
     local_filesL3=glob.glob(RBSPDir+'/'+instrument+'/L3/'+sc_id+'/'+file_matchL3)
-    
-    #print(local_filesL2)
-    
 
-    
-    #if instrument=='rept':
-    #    #print(RBSPDir+'/rept/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*2_'+str(yr)+mo+day+'_v*.cdf')
-    #    L2files=glob.glob(RBSPDir+'/rept/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*2_'+str(yr)+mo+day+'_v*.cdf')
-    #    L3files=glob.glob(RBSPDir+'/rept/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_rel03_ect-rept-sci-*3_'+str(yr)+mo+day+'_v*.cdf')
-    #if instrument=='mageis':
-    #    L2files=glob.glob(RBSPDir+'/mageis/L2/'+sc_id+'/rbsp'+sc_id.lower()+'_rel0*_ect-mageis-*2_'+str(yr)+str(mo)+str(day)+'_v*.cdf')
-    #    L3files=glob.glob(RBSPDir+'/mageis/L3/'+sc_id+'/rbsp'+sc_id.lower()+'_rel0*_ect-mageis-*3_'+str(yr)+mo+day+'_v*.cdf')
+
+
+
     if len(local_filesL2) in [1, 2]:
-        print('1 or 2')
+        print('at least on L2 exists in local directory')
         L2 = pycdf.CDF(local_filesL2[0])
     elif len(local_filesL2) == 0:
-        print('0')
+        print('no local L2, downloading')
         print(f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l2/ect/{instrument}/sectors/{rel}/{yr}/')
         downloader = sin_PADs.Downloader(
                 f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l2/ect/{instrument}/sectors/{rel}/{yr}/',
                 download_dir=RBSPDir+'/'+instrument+'/L2/'+sc_id
                 )
-        
+
         matched_downloaders = downloader.ls(match=file_matchL2)
-        file_path = matched_downloaders[0].download(stream='True') 
+        file_path = matched_downloaders[0].download(stream='True')
         L2=pycdf.CDF(str(file_path))
-        
+
     if len(local_filesL3) in [1, 2]:
-        print('1 or 2')
+        print('at least one L3 exists in local directory')
         L3 = pycdf.CDF(local_filesL3[0])
     elif len(local_filesL3) == 0:
-        print('0')
+        print('no local L3, downloading')
         print(f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l2/ect/{instrument}/sectors/{rel}/{yr}/')
         downloader = sin_PADs.Downloader(
                 f'https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sc_id.lower()}/l3/ect/{instrument}/sectors/{rel}/{yr}/',
                 download_dir=RBSPDir+'/'+instrument+'/L3/'+sc_id
                 )
-        
+
         matched_downloaders = downloader.ls(match=file_matchL3)
-        file_path = matched_downloaders[0].download(stream='True') 
+        file_path = matched_downloaders[0].download(stream='True')
         L3=pycdf.CDF(str(file_path))
-            
-    
-    #L3 = pycdf.CDF(L3files[0])
-    
 
-    print(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
 
-    file_exists=exists(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
+    this_directory=sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/'+particle+'/'
+    this_file='rbsp'+sc_id.lower()+'_'+rel+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'_'+particle+'_v2.cdf'
+    this_filename=this_directory+this_file
+
+    print(this_filename)
+
+    file_exists=exists(this_filename)
 
     if ((file_exists)&(rewrite=='yes')):
         print('overwriting cdf')
-        os.remove(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf')
-        fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel)
+        os.remove(this_filename)
+        fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel,particle,legendre)
     if ((file_exists==False)):
-        fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel)
+        print('creating new cdf')
+        fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel,particle,legendre)
     if ((file_exists)&(rewrite=='no')):
-        print('Skipping this one')
+        print('rewrite=no - Skipping this one')
         pass
 
 
-def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
+def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel,particle,legendre):
 
     xxA=[pyind.timetuple().tm_yday+float(pyind.strftime("%H"))/24.+float(pyind.strftime("%M"))/1400.+float(pyind.strftime("%S"))/86400. for pyind in L3['Epoch']]
     ephem=readephemdata(sc_id.lower(),yr,mo,day)
@@ -143,38 +145,26 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
     orbnum = np.searchsorted(xx2A,xxA, side="left")
     inout=ephem[0]
 
-    if instrument=='rept':
-        L3time=L3['Epoch'][:]
-        L3alpha=L3['FEDU_Unbinned_Alpha'][:] #[7000,36]
-        L3alphaindex=L3['FEDU_Unbinned_Alpha'][0,:]
-        L3fedu=L3['FEDU_Unbinned_0to180']
-        L3energy=L3['FEDU_Energy'][:]
-    if instrument=='mageis':
-        L3time=L3['Epoch'][:]
-        L3alpha=L3['FEDU_Alpha'][:] #[11]
-        L3alphaindex=L3['FEDU_Alpha'][:]
-        L3fedu=L3['FEDU']
-        if rel=='rel04':
-            L3energy=L3['FEDU_Energy'][:] #1820
-        elif rel=='rel03':
-            L3energy=L3['FEDU_Energy'][0,:] #1820
+
+    if particle=='electrons':
+        L3binnedA=L3['FEDU_Alpha'][:]
+    elif particle=='protons':
+        L3binnedA=L3['FPDU_Alpha'][:]
+    L3time,L3alpha,L3alpha_binned,L3alphaindex,L3du,L3energy,B_eq,B_calc=initiate_variables(L3,instrument,particle,rel)
 
 
-    eq_pitch=sin_PADs.fit_funcs.pitchangle_func(L3alpha.astype('float'),L3['B_Eq'][:],L3['B_Calc'][:],instrument)
-    eq_pitch_binned=sin_PADs.fit_funcs.pitchangle_func(L3['FEDU_Alpha'][:],L3['B_Eq'][:],L3['B_Calc'][:],instrument,'1d')
+    eq_pitch=sin_PADs.fit_funcs.pitchangle_func(L3alpha.astype('float'),B_eq,B_calc,instrument)
+    eq_pitch_binned=sin_PADs.fit_funcs.pitchangle_func(L3binnedA,B_eq,B_calc,instrument,'1d')
 
-    flux_fromfit_arr=np.nan*np.ones((len(L3time),len(L3alphaindex),len(L3energy)), dtype=float)
-    flux_fromfit_arr_atbinned=np.nan*np.ones((len(L3time),len(L3['FEDU_Alpha'][:]),len(L3energy)), dtype=float)
-    rmse_arr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
-    l_rmse_arr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
-    l_fit_arr=np.nan*np.ones((len(L3time),len(L3alphaindex),len(L3energy)), dtype=float);
-    butt_arr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
-    PAIndex_arr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
-    fit_arr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
-    fit_arr_atbinned=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
-    cn=np.nan*np.ones((len(L3time),len(L3energy),5), dtype=float);
-    cfull=np.nan*np.ones((len(L3time),len(L3energy),5), dtype=float);
-    maxloarr=np.nan*np.ones((len(L3time),len(L3energy)), dtype=float);
+
+    #initialize arrays
+
+    #electron arrays
+    #if legendre=='yes':
+        #flux_fromfit_arr,flux_fromfit_arr_atbinned,rmse_arr,butt_arr,PAIndex_arr,fit_arr,fit_arr_atbinned,maxloarr,cn,cfull,l_rmse_arr,l_fit_arr=create_arrays(len(L3time),len(L3alphaindex),len(L3energy),legendre)
+    #else:
+
+    flux_fromfit_arr,flux_fromfit_arr_atbinned,rmse_arr,butt_arr,PAIndex_arr,fit_arr,fit_arr_atbinned,maxloarr,legendre_arrs=create_arrays(len(L3time),len(L3alphaindex),len(L3energy),legendre)
 
 
 
@@ -182,84 +172,88 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
         for tim in range(0,len(L3time)):
 
             #assume 0-90 = 90-180
-            xfit1=eq_pitch[tim]
-            yfit1=L3fedu[tim,:,en]
-
-            xfit2=np.abs(xfit1-180)
-            yfit2=yfit1
-
-            xfittot=np.append(xfit1,xfit2)
-            yfittot=np.append(yfit1,yfit2)
+            #very important for mageis
 
 
-            fitparams_eq=sin_PADs.fit_funcs.curvetest(xfittot,yfittot);
-            #closest PA to 90
-            maxlo=max(xfittot[xfittot<90]);
+            yfit,yfit_atbinned,rmse,butterfly,fitparams_eq,maxlo=all_fits(tim,en,eq_pitch,L3du,L3alpha,L3alpha_binned,legendre)
 
 
-            yfit=sin_PADs.fit_funcs.test_func(xfit1*np.pi/180.,fitparams_eq[0],fitparams_eq[1]);
-            yfit_atbinned=sin_PADs.fit_funcs.test_func(L3['FEDU_Alpha'][:]*np.pi/180.,fitparams_eq[0],fitparams_eq[1]);
-            rmse=sin_PADs.fit_funcs.RMSEtestnonint(yfit,yfit1);
-            butterfly=sin_PADs.fit_funcs.butterflytest(xfit1,yfit);
-            #a*sin**B
-            #a
+            """
+            functional form is y=a*sin(x)**b
+            a=fitparams_eq[0]
+            b=fitparams_eq[0]
+            """
             fit_arr[tim,en]=fitparams_eq[0]
-            #b
             PAIndex_arr[tim,en]=fitparams_eq[1]
 
-            if len(xfittot[(yfittot>0)&(xfittot>0)]) > 3:
-                cc=np.polynomial.legendre.legfit(np.cos(np.array(xfittot[(yfittot>0)&(xfittot>0)])*np.pi/180.),yfittot[(yfittot>0)&(xfittot>0)],4)
-                cfull[tim,en]=cc
-                cc[1:]=cc[1:]/cc[0]
-            else:
-                cc=[np.nan,np.nan,np.nan,np.nan,np.nan]
-                cfull[tim,en]=cc
 
-            cn[tim,en]=cc
-
-            cs=np.cos(np.array(xfit1)*np.pi/180.)
-            l_fit=cfull[tim,en,0]*legendre(0)(cs)+cfull[tim,en,1]*legendre(1)(cs)+cfull[tim,en,2]*legendre(2)(cs)+cfull[tim,en,3]*legendre(3)(cs)+cfull[tim,en,4]*legendre(4)(cs)
-            l_rmse=sin_PADs.fit_funcs.RMSEtestnonint(np.log10(yfit1),l_fit);
-
-
-            for alph in range(0,11):
+            for alph in range(0,len(L3alpha_binned)):
                 flux_fromfit_arr_atbinned[tim,alph,en]=yfit_atbinned[alph];
             for alph in range(0,len(yfit)):
-                #y values from the fit?
                 flux_fromfit_arr[tim,alph,en]=yfit[alph];
-
-                l_fit_arr[tim,alph,en]=l_fit[alph]
+                #l_fit_arr[tim,alph,en]=l_fit[alph]
             rmse_arr[tim,en]=rmse;
             butt_arr[tim,en]=butterfly;
-            l_rmse_arr[tim,en]=l_rmse
+            #l_rmse_arr[tim,en]=l_rmse
             maxloarr[tim,en]=maxlo
 
+
     print('Writing to cdf')
-    cdf2 = pycdf.CDF(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/rbsp'+sc_id.lower()+'_'+rel+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'.cdf', '')
+    filpath=sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id
+    if not os.path.isdir(filpath):
+        os.makedir(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id)
+
+
+    cdf2 = pycdf.CDF(sin_PADs.project_data_dir+'/RBSP/'+instrument+'/L4PAI/'+sc_id+'/'+particle+'/rbsp'+sc_id.lower()+'_'+rel+'_ect_'+instrument+'-PAI'+str(yr)+str(mo)+str(day)+'_'+particle+'_v2.cdf', '')
 
     #Depend, time
     cdf2['Epoch']=L3['Epoch'][:]
     cdf2['Epoch'].attrs['SCALETYP']='linear'
     cdf2['Epoch'].attrs['LABLAXIS']='Time'
 
+
+    if particle=='electrons':
+        var_name_sa='FESA'
+        var_name_du='FEDU'
+        var_du_eq='FEDU_Eq'
+        du_en=L3['FEDU_Energy'][:]
+        du_unbinned='FEDU_Unbinned_0to180'
+        var_du_alpha='FEDU_Alpha'
+        du_alpha=L3['FEDU_Alpha'][:]
+        if instrument=='mageis':
+            sa_corr=L2['FESA_CORR'][:]
+        if instrument=='rept':
+            var_du_unbinned='FEDU_Unbinned_Alpha'
+    elif particle=='protons':
+        var_name_sa='FPSA'
+        var_name_du='FPDU'
+        var_du_alpha='FPDU_Alpha'
+        du_alpha=L3['FPDU_Alpha'][:]
+        du_en=L3['FPDU_Energy'][0,:]
+        var_du_eq='FPDU_Eq'
+        du_unbinned='FPDU_Unbinned_0to180'
+        if instrument=='rept':
+            var_du_unbinned='FPDU_Unbinned_Alpha'
+    #print('{} {} {}'.format(var_sa,var_du,var_du_alpha))
+
     #Depend, energy
     #keV for mageis, MeV for rept
-    cdf2['Energy']=L3['FEDU_Energy'][:]
+    cdf2['Energy']=du_en
     cdf2['Energy'].attrs['FIELDNAM']='Energy'
-    cdf2['Energy'].attrs['CATDESC']='Energy bins from FEDU'
+    cdf2['Energy'].attrs['CATDESC']='Energy bins from '+var_name_du
     cdf2['Energy'].attrs['FILLVAL']=-1e+31
     cdf2['Energy'].attrs['VALIDMIN']=0.0
     cdf2['Energy'].attrs['VALIXMAX']=100.0
     cdf2['Energy'].attrs['FORMAT']='E12.2'
     cdf2['Energy'].attrs['LABLAXIS']='Energy'
     cdf2['Energy'].attrs['SCALETYP']='log'
-    if instrument=='mageis'& rel=='rel03':
+    if ((instrument=='mageis') & (rel=='rel03')):
         cdf2['Energy'].attrs['DEPEND_0']='Epoch'
 
 
 
     if instrument=='mageis':
-        cdf2['EnergyMeV']=L3['FEDU_Energy'][:]/1000.
+        cdf2['EnergyMeV']=du_en/1000.
         cdf2['EnergyMeV'].attrs['UNITS']='MeV'
         cdf2['EnergyMeV'].attrs['VALIDMIN']=0.0
         cdf2['EnergyMeV'].attrs['VALIXMAX']=100.0
@@ -267,12 +261,11 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
         if rel=='rel03':
             cdf2['EnergyMeV'].attrs['DEPEND_0']='Epoch'
 
-        cdf2['FESA_CORR']=L2['FESA_CORR'][:]*1000.
-        cdf2['FESA_CORR'].attrs['DEPEND_0']= 'Epoch'
-        cdf2['FESA_CORR'].attrs['DEPEND_1']= 'EnergyMeV'
-        cdf2['FESA_CORR'].attrs['VAR_TYPE']='data'
-
-
+        if particle=='electrons':
+            cdf2['FESA_CORR']=sa_corr*1000.
+            cdf2['FESA_CORR'].attrs['DEPEND_0']= 'Epoch'
+            cdf2['FESA_CORR'].attrs['DEPEND_1']= 'EnergyMeV'
+            cdf2['FESA_CORR'].attrs['VAR_TYPE']='data'
 
 
 
@@ -286,7 +279,7 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
     cdf2['Alpha_equatorial'].attrs['SCALETYP']='linear'
     cdf2['Alpha_equatorial'].attrs['DEPEND_0']= 'Epoch'
     cdf2['Alpha_equatorial'].attrs['CATDESC']='Pitch Angle mapped to equator'
-    cdf2['Alpha_equatorial'].attrs['VAR_NOTES']='FEDU_Unbinned_Alpha to equatorial'
+    cdf2['Alpha_equatorial'].attrs['VAR_NOTES']=var_name_du+'_Unbinned_Alpha to equatorial'
     cdf2['Alpha_equatorial'].attrs['VAR_TYPE']='support_data'
 
     #for binned fedu 0 to 180
@@ -299,22 +292,27 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
     cdf2['Alpha_equatorial_binned'].attrs['SCALETYP']='linear'
     cdf2['Alpha_equatorial_binned'].attrs['DEPEND_0']= 'Epoch'
     cdf2['Alpha_equatorial_binned'].attrs['CATDESC']='Pitch Angle mapped to equator'
-    cdf2['Alpha_equatorial_binned'].attrs['VAR_NOTES']='FEDU_Alpha to equatorial'
+    cdf2['Alpha_equatorial_binned'].attrs['VAR_NOTES']=var_name_du+'_Alpha to equatorial'
     cdf2['Alpha_equatorial_binned'].attrs['VAR_TYPE']='support_data'
 
-    cdf2['FEDU_Alpha']=L3['FEDU_Alpha'][:]
-    cdf2['FEDU_Alpha'].attrs['VALIDMIN']=0.0
-    cdf2['FEDU_Alpha'].attrs['VALIDMAX']=180.0
-    cdf2['FEDU_Alpha'].attrs['FIELDNAM']='FEDU_Alpha'
-    cdf2['FEDU_Alpha'].attrs['CATDESC']='Pitch Angles for FEDU, binned'
-    cdf2['FEDU_Alpha'].attrs['VAR_TYPE']='support_data'
+
+
+
+
+    cdf2[var_du_alpha]=du_alpha
+    cdf2[var_du_alpha].attrs['VALIDMIN']=0.0
+    cdf2[var_du_alpha].attrs['VALIDMAX']=180.0
+    cdf2[var_du_alpha].attrs['FIELDNAM']=var_du_alpha
+    cdf2[var_du_alpha].attrs['CATDESC']='Pitch Angles for '+var_name_du+', binned'
+    cdf2[var_du_alpha].attrs['VAR_TYPE']='support_data'
+
 
 
     if instrument=='rept':
-        cdf2['FEDU_Unbinned_Alpha']=L3alpha
-        cdf2['FEDU_Unbinned_Alpha'].attrs['VALIDMIN']=0.0
-        cdf2['FEDU_Unbinned_Alpha'].attrs['VALIDMAX']=180.0
-        cdf2['FEDU_Unbinned_Alpha'].attrs['FIELDNAM']='FEDU_Alpha'
+        cdf2[var_du_unbinned]=L3alpha
+        cdf2[var_du_unbinned].attrs['VALIDMIN']=0.0
+        cdf2[var_du_unbinned].attrs['VALIDMAX']=180.0
+        cdf2[var_du_unbinned].attrs['FIELDNAM']=var_du_alpha
 
     cdf2['flux_fromfit_eq']=flux_fromfit_arr
     cdf2['flux_fromfit_eq'].attrs['units'] = 'cm2sr'
@@ -326,20 +324,13 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
     if instrument=='rept':
         cdf2['flux_fromfit_eq'].attrs['DEPEND_2']= 'Energy'
 
-    #L3alpha=L3['FEDU_Unbinned_Alpha'][:] #[7000,36]
-    #cdf2['flux_fit']=flux_fromfit_arr
-    #cdf2['flux_fit'].attrs['units'] = 'cm2sr'
-    #cdf2['flux_fit'].attrs['DEPEND_0']= 'Epoch'
-    #cdf2['flux_fit'].attrs['DEPEND_1']= 'FEDU_Alpha'
-    #if instrument=='mageis':
-    #    cdf2['flux_fit'].attrs['DEPEND_2']= 'EnergyMeV'
-    #if instrument=='rept':
-    #    cdf2['flux_fit'].attrs['DEPEND_2']= 'Energy'
+
+
 
     cdf2['flux_fromfit_binned']=flux_fromfit_arr_atbinned
     cdf2['flux_fromfit_binned'].attrs['units'] = 'cm2sr'
     cdf2['flux_fromfit_binned'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['flux_fromfit_binned'].attrs['DEPEND_1']= 'FEDU_Alpha'
+    cdf2['flux_fromfit_binned'].attrs['DEPEND_1']= var_du_alpha
     cdf2['flux_fromfit_binned'].attrs['VAR_NOTES']='flux values from the fitting algorithm (to compare data with fit).'
     if instrument=='mageis':
         cdf2['flux_fromfit_binned'].attrs['DEPEND_2']= 'EnergyMeV'
@@ -347,15 +338,9 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
         cdf2['flux_fromfit_binned'].attrs['DEPEND_2']= 'Energy'
     #calc_flux_fromfit
     #flux_from_fit
-    cdf2['flux_fromfit_legendre']=l_fit_arr
-    cdf2['flux_fromfit_legendre'].attrs['units'] = 'cm2sr'
-    cdf2['flux_fromfit_legendre'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['flux_fromfit_legendre'].attrs['DEPEND_1']= 'FEDU_Unbinned_Alpha'
-    cdf2['flux_fromfit_legendre'].attrs['VAR_NOTES']='flux values from the fitting algorithm (to compare data with fit).'
-    if instrument=='mageis':
-        cdf2['flux_fromfit_legendre'].attrs['DEPEND_2']= 'EnergyMeV'
-    if instrument=='rept':
-        cdf2['flux_fromfit_legendre'].attrs['DEPEND_2']= 'Energy'
+
+
+
 
     #PAI, time and energy depend
     cdf2['PAIndex']=PAIndex_arr
@@ -369,33 +354,58 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
     if instrument=='rept':
         cdf2['PAIndex'].attrs['DEPEND_1']= 'Energy'
 
+
+
     #legendre polynomials
-    cdf2['cn']=cn
-    cdf2['cn'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['cn'].attrs['DISPLAY_TYPE']='time_series'
-    cdf2['cn'].attrs['VAR_TYPE']='data'
-    if instrument=='mageis':
-        cdf2['cn'].attrs['DEPEND_1']= 'EnergyMeV'
-    if instrument=='rept':
-        cdf2['cn'].attrs['DEPEND_1']= 'Energy'
+    if legendre=='yes':
+        cdf2['flux_fromfit_legendre']=l_fit_arr
+        cdf2['flux_fromfit_legendre'].attrs['units'] = 'cm2sr'
+        cdf2['flux_fromfit_legendre'].attrs['DEPEND_0']= 'Epoch'
+        cdf2['flux_fromfit_legendre'].attrs['DEPEND_1']= 'FEDU_Unbinned_Alpha'
+        cdf2['flux_fromfit_legendre'].attrs['VAR_NOTES']='flux values from the fitting algorithm (to compare data with fit).'
+        if instrument=='mageis':
+            cdf2['flux_fromfit_legendre'].attrs['DEPEND_2']= 'EnergyMeV'
+        if instrument=='rept':
+            cdf2['flux_fromfit_legendre'].attrs['DEPEND_2']= 'Energy'
+        cdf2['cn']=cn
+        cdf2['cn'].attrs['DEPEND_0']= 'Epoch'
+        cdf2['cn'].attrs['DISPLAY_TYPE']='time_series'
+        cdf2['cn'].attrs['VAR_TYPE']='data'
+        if instrument=='mageis':
+            cdf2['cn'].attrs['DEPEND_1']= 'EnergyMeV'
+        if instrument=='rept':
+            cdf2['cn'].attrs['DEPEND_1']= 'Energy'
 
-    cdf2['cn2b4']=cn[:,:,2]/cn[:,:,4]
-    cdf2['cn2b4'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['cn2b4'].attrs['DISPLAY_TYPE']='time_series'
-    cdf2['cn2b4'].attrs['VAR_TYPE']='data'
-    if instrument=='mageis':
-        cdf2['cn2b4'].attrs['DEPEND_1']= 'EnergyMeV'
-    if instrument=='rept':
-        cdf2['cn2b4'].attrs['DEPEND_1']= 'Energy'
+        cdf2['cn2b4']=cn[:,:,2]/cn[:,:,4]
+        cdf2['cn2b4'].attrs['DEPEND_0']= 'Epoch'
+        cdf2['cn2b4'].attrs['DISPLAY_TYPE']='time_series'
+        cdf2['cn2b4'].attrs['VAR_TYPE']='data'
+        if instrument=='mageis':
+            cdf2['cn2b4'].attrs['DEPEND_1']= 'EnergyMeV'
+        if instrument=='rept':
+            cdf2['cn2b4'].attrs['DEPEND_1']= 'Energy'
 
-    cdf2['cfull']=cfull
-    cdf2['cfull'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['cfull'].attrs['DISPLAY_TYPE']='time_series'
-    cdf2['cfull'].attrs['VAR_TYPE']='data'
-    if instrument=='mageis':
-        cdf2['cfull'].attrs['DEPEND_1']= 'EnergyMeV'
-    if instrument=='rept':
-        cdf2['cfull'].attrs['DEPEND_1']= 'Energy'
+        cdf2['cfull']=cfull
+        cdf2['cfull'].attrs['DEPEND_0']= 'Epoch'
+        cdf2['cfull'].attrs['DISPLAY_TYPE']='time_series'
+        cdf2['cfull'].attrs['VAR_TYPE']='data'
+        if instrument=='mageis':
+            cdf2['cfull'].attrs['DEPEND_1']= 'EnergyMeV'
+        if instrument=='rept':
+            cdf2['cfull'].attrs['DEPEND_1']= 'Energy'
+
+            cdf2['RMSE_legendre']=l_rmse_arr
+
+        cdf2['RMSE_legendre'].attrs['DEPEND_0']= 'Epoch'
+        cdf2['RMSE_legendre'].attrs['VALIDMIN']=0
+        cdf2['RMSE_legendre'].attrs['VALIDMAX']=1
+        cdf2['RMSE_legendre'].attrs['FIELDNAM']='RMSE'
+        cdf2['RMSE_legendre'].attrs['VAR_TYPE']='support_data'
+        if instrument=='mageis':
+            cdf2['RMSE_legendre'].attrs['DEPEND_1']= 'EnergyMeV'
+        if instrument=='rept':
+            cdf2['RMSE_legendre'].attrs['DEPEND_1']= 'Energy'
+        cdf2['RMSE_legendre'].attrs['CATDESC']='RMSE for legendre fit'
 
 
     cdf2['butterfly']=butt_arr
@@ -423,19 +433,74 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
     cdf2['J0'].attrs['DISPLAY_TYPE']='time_series'
 
 
-    cdf2['RMSE_legendre']=l_rmse_arr
-    cdf2['RMSE_legendre'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['RMSE_legendre'].attrs['VALIDMIN']=0
-    cdf2['RMSE_legendre'].attrs['VALIDMAX']=1
-    cdf2['RMSE_legendre'].attrs['FIELDNAM']='RMSE'
-    cdf2['RMSE_legendre'].attrs['VAR_TYPE']='support_data'
+
+
+
+
+
+
     if instrument=='mageis':
-        cdf2['RMSE_legendre'].attrs['DEPEND_1']= 'EnergyMeV'
+        cdf2[var_name_sa]=L2[var_name_sa][:]*1000.
+        cdf2[var_name_sa].attrs['DEPEND_1']= 'EnergyMeV'
     if instrument=='rept':
-        cdf2['RMSE_legendre'].attrs['DEPEND_1']= 'Energy'
-    cdf2['RMSE_legendre'].attrs['CATDESC']='RMSE for legendre fit'
+        cdf2[var_name_sa]=L2[var_name_sa][:]
+        cdf2[var_name_sa].attrs['DEPEND_1']= 'Energy'
 
 
+
+
+
+    cdf2[var_name_sa].attrs['DEPEND_0']= 'Epoch'
+    cdf2[var_name_sa].attrs['SCALETYP'] = 'log'
+    cdf2[var_name_sa].attrs['VALIDMIN'] = 0.01
+    cdf2[var_name_sa].attrs['VALIDMAX']=1e+31
+    cdf2[var_name_sa].attrs['CATDESC']='Spin-averaged differential '+particle+' flux.'
+    cdf2[var_name_sa].attrs['DISPLAY_TYPE']='nnSpectrogram'
+    cdf2[var_name_sa].attrs['FIELDNAM']=var_name_sa
+    cdf2[var_name_sa].attrs['FILLVAL']=-1e+31
+    cdf2[var_name_sa].attrs['FORMAT']='E10.3'
+    cdf2[var_name_sa].attrs['VAR_TYPE']='data'
+
+
+
+    if instrument=='mageis':
+        cdf2[var_name_du]=L3[var_name_du][:]*1000.
+        cdf2[var_name_du].attrs['DEPEND_2']= 'EnergyMeV'
+    if instrument=='rept':
+        cdf2[var_name_du]=L3[var_name_du][:]
+        cdf2[var_name_du].attrs['DEPEND_2']= 'Energy'
+    cdf2[var_name_du].attrs['DEPEND_0']= 'Epoch'
+    cdf2[var_name_du].attrs['DEPEND_1']= var_du_alpha #
+    cdf2[var_name_du].attrs['DISPLAY_TYPE']='nnSpectrogram'
+    cdf2[var_name_du].attrs['FIELDNAM']=var_name_du
+    cdf2[var_name_du].attrs['FILLVAL']=-1e+31
+    cdf2[var_name_du].attrs['FORMAT']='E12.2'
+    cdf2[var_name_du].attrs['SCALTYP']='log'
+    cdf2[var_name_du].attrs['VAR_TYPE']='data'
+    cdf2[var_name_du].attrs['VALIDMIN']=0
+    cdf2[var_name_du].attrs['VALIDMAX']=1e+31
+
+
+
+    #binned FEDU with equatorial pitch angles
+    if instrument=='mageis':
+        cdf2[var_du_eq]=L3[var_name_du][:]*1000.
+        cdf2[var_du_eq].attrs['DEPEND_2']= 'EnergyMeV'
+    if instrument=='rept':
+        cdf2[var_du_eq]=L3['FEDU'][:]
+        cdf2[var_du_eq].attrs['DEPEND_2']= 'Energy'
+    cdf2[var_du_eq].attrs['DEPEND_0']= 'Epoch'
+    cdf2[var_du_eq].attrs['DEPEND_1']= 'Alpha_equatorial_binned'
+    cdf2[var_du_eq].attrs['DISPLAY_TYPE']='nnSpectrogram'
+    cdf2[var_du_eq].attrs['FIELDNAM']='FEDU_Eq'
+    cdf2[var_du_eq].attrs['FILLVAL']=-1e+31
+    cdf2[var_du_eq].attrs['FORMAT']='E12.2'
+    cdf2[var_du_eq].attrs['SCALTYP']='log'
+    cdf2[var_du_eq].attrs['VAR_TYPE']='data'
+    cdf2[var_du_eq].attrs['VALIDMIN']=0
+    cdf2[var_du_eq].attrs['VALIDMAX']=1e+31
+
+    ###### GENERAL
     cdf2['RMSE']=rmse_arr
     cdf2['RMSE'].attrs['DEPEND_0']= 'Epoch'
     cdf2['RMSE'].attrs['VALIDMIN']=0
@@ -446,60 +511,6 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
         cdf2['RMSE'].attrs['DEPEND_1']= 'EnergyMeV'
     if instrument=='rept':
         cdf2['RMSE'].attrs['DEPEND_1']= 'Energy'
-
-    if instrument=='mageis':
-        cdf2['FESA']=L2['FESA'][:]*1000.
-        cdf2['FESA'].attrs['DEPEND_1']= 'EnergyMeV'
-    if instrument=='rept':
-        cdf2['FESA']=L2['FESA'][:]
-        cdf2['FESA'].attrs['DEPEND_1']= 'Energy'
-
-    cdf2['FESA'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['FESA'].attrs['SCALETYP'] = 'log'
-    cdf2['FESA'].attrs['VALIDMIN'] = 0.01
-    cdf2['FESA'].attrs['VALIDMAX']=1e+31
-    cdf2['FESA'].attrs['CATDESC']='Spin-averaged differential electron flux (lowest electron bin is not valid inside of L=2.8) and integral flux for the last 2 bins.'
-    #cdf2['FESA'].attrs['VAR_NOTES']='MeV for mageis and rept, not corr for MagEIS'
-    cdf2['FESA'].attrs['DISPLAY_TYPE']='nnSpectrogram'
-    cdf2['FESA'].attrs['FIELDNAM']='FESA'
-    cdf2['FESA'].attrs['FILLVAL']=-1e+31
-    cdf2['FESA'].attrs['FORMAT']='E10.3'
-    cdf2['FESA'].attrs['VAR_TYPE']='data'
-
-    if instrument=='mageis':
-        cdf2['FEDU']=L3['FEDU'][:]*1000.
-        cdf2['FEDU'].attrs['DEPEND_2']= 'EnergyMeV'
-    if instrument=='rept':
-        cdf2['FEDU']=L3['FEDU'][:]
-        cdf2['FEDU'].attrs['DEPEND_2']= 'Energy'
-    cdf2['FEDU'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['FEDU'].attrs['DEPEND_1']= 'FEDU_Alpha' #FEDU_Alpha is length 17
-    cdf2['FEDU'].attrs['DISPLAY_TYPE']='nnSpectrogram'
-    cdf2['FEDU'].attrs['FIELDNAM']='FEDU'
-    cdf2['FEDU'].attrs['FILLVAL']=-1e+31
-    cdf2['FEDU'].attrs['FORMAT']='E12.2'
-    cdf2['FEDU'].attrs['SCALTYP']='log'
-    cdf2['FEDU'].attrs['VAR_TYPE']='data'
-    cdf2['FEDU'].attrs['VALIDMIN']=0
-    cdf2['FEDU'].attrs['VALIDMAX']=1e+31
-
-    #binned FEDU with equatorial pitch angles
-    if instrument=='mageis':
-        cdf2['FEDU_Eq']=L3['FEDU'][:]*1000.
-        cdf2['FEDU_Eq'].attrs['DEPEND_2']= 'EnergyMeV'
-    if instrument=='rept':
-        cdf2['FEDU_Eq']=L3['FEDU'][:]
-        cdf2['FEDU_Eq'].attrs['DEPEND_2']= 'Energy'
-    cdf2['FEDU_Eq'].attrs['DEPEND_0']= 'Epoch'
-    cdf2['FEDU_Eq'].attrs['DEPEND_1']= 'Alpha_equatorial_binned'
-    cdf2['FEDU_Eq'].attrs['DISPLAY_TYPE']='nnSpectrogram'
-    cdf2['FEDU_Eq'].attrs['FIELDNAM']='FEDU_Eq'
-    cdf2['FEDU_Eq'].attrs['FILLVAL']=-1e+31
-    cdf2['FEDU_Eq'].attrs['FORMAT']='E12.2'
-    cdf2['FEDU_Eq'].attrs['SCALTYP']='log'
-    cdf2['FEDU_Eq'].attrs['VAR_TYPE']='data'
-    cdf2['FEDU_Eq'].attrs['VALIDMIN']=0
-    cdf2['FEDU_Eq'].attrs['VALIDMAX']=1e+31
 
     cdf2['MLAT']=L3['MLAT'][:]
     cdf2['MLAT'].attrs['DEPEND_0']= 'Epoch'
@@ -561,11 +572,7 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
     cdf2['B_Eq'].attrs['LABLAXIS']='B'
     cdf2['B_Eq'].attrs['VAR_TYPE']='support_data'
 
-    #print(type(orbnum[0]))
-    #print(np.shape(orbnum))
-    #print(L3['Epoch'][0])
     oo=[np.uint8(ii) for ii in orbnum]
-    #print(np.shape(L3['Epoch'][:]))
     cdf2['orbit_number']=oo
     cdf2['orbit_number'].attrs['DEPEND_0']= 'Epoch'
     cdf2['orbit_number'].attrs['VAR_TYPE']='support_data'
@@ -576,13 +583,14 @@ def fit_data(L2,L3,sc_id,yr,mo,day,instrument,rel):
     cdf2['closest_PA_90deg'].attrs['DEPEND_1']= 'Energy'
     cdf2['closest_PA_90deg'].attrs['VAR_TYPE']='support_data'
     cdf2['closest_PA_90deg'].attrs['CATDESC']='closest PA to 90 degrees'
+    ###########
 
 
     if instrument=='rept':
-        cdf2['FEDU_Unbinned_0to180']=L3['FEDU_Unbinned_0to180'][:]
-        cdf2['FESA'].attrs['UNITS'] = 'cm!e-2!ns!e-1!nsr!e-1!nMeV!e-1!n'
+        cdf2[du_unbinned]=L3[du_unbinned][:]
+        cdf2[var_name_sa].attrs['UNITS'] = 'cm!e-2!ns!e-1!nsr!e-1!nMeV!e-1!n'
         cdf2['Energy'].attrs['UNITS']='MeV'
-        cdf2['FESA'].attrs['VAR_NOTES']='Dimension 1 corresponds to 12 electron energy bins. The units for the last 2 bins are 1/(cm^2-s-sr).'
+        cdf2[var_name_sa].attrs['VAR_NOTES']='Dimension 1 corresponds to 12 electron energy bins. The units for the last 2 bins are 1/(cm^2-s-sr).'
 
 
     cdf2.attrs['Author'] = 'Ashley Greeley'

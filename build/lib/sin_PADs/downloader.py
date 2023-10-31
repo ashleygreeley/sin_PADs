@@ -1,4 +1,10 @@
+from __future__ import annotations
 from bs4 import BeautifulSoup
+from typing import List
+import urllib
+import re
+import requests
+import pathlib
 
 class Downloader:
 
@@ -39,6 +45,7 @@ class Downloader:
             return download_path
 
         if stream:
+            print('stream')
             r = requests.get(self.url, stream=True)
             file_size = int(r.headers.get('content-length'))
             downloaded_bites = 0
@@ -55,6 +62,7 @@ class Downloader:
                     print(f'Downloading {file_name}: |{download_str:<20}| {download_percent}%', end='\r')
             print()  # Add a newline
         else:
+            print('not stream')
             r = requests.get(self.url)
             with open(download_path, 'wb') as f:
                 f.write(r.content)

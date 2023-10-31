@@ -39,3 +39,6 @@ from sin_PADs import create_fits
 
 sin_PADs.create_fits.load_data('A','2012-10-26','rept',rewrite='yes')
 #takes sc_id, date, instrument, and rewrite cdf?
+
+[![DOI](https://zenodo.org/badge/618530805.svg)](https://zenodo.org/badge/latestdoi/618530805)
+

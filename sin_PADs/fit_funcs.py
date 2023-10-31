@@ -69,7 +69,7 @@ def curvetest(xx,yy):
     ff=np.where(yy>0)
     if (len(yy)>3)&(len(ff[0])>3):
         try:
-            params, paramsco=optimize.curve_fit(test_func, xx* np.pi / 180. , yy,p0=[8000, 3], maxfev=15000)
+            params, paramsco=optimize.curve_fit(test_func, xx* np.pi / 180. , yy,p0=[np.nanmax(yy), 3], maxfev=5000)
             paramarray=[params[0],params[1]]
         except RuntimeError:
             paramarray=[np.nan,np.nan]
@@ -92,16 +92,34 @@ def butterflytest(xx,yy):
     jj=[]
     xx=np.array(xx)
     yy=np.array(yy)
-    for hh in range(6,45):
-        gg=np.where((xx > 90-hh) & (xx < 90+hh))
-        jj.append(np.mean(yy[gg]))
-    gg=np.where((xx > 75) & (xx < 105))
-    middle=np.nanmean(yy[gg])
-    edges=np.nanmax(jj)*.95
-    if middle < edges:
-        return 1
+    nonnan=[]
+    #print(xx)
+    #print(yy)
+
+    if len(yy[yy>0])>3:
+        for hh in range(6,70):
+            gg=np.where((xx > 90-hh) & (xx < 90+hh))
+            jj.append(np.nanmean(yy[gg]))
+            #print('{}-{}, {}'.format(90-hh,90+hh,np.nanmean(yy[gg])))
+            if np.nanmean(yy[gg])>0:
+                nonnan.append(hh)
+        gg=np.where((xx > 75) & (xx < 105))
+        if len(gg[0]>0):
+            middle=np.nanmean(yy[gg])
+        elif len(np.array(nonnan)>1):
+            #print('NONNAN')
+            #print(nonnan)
+            gg=np.where((xx >= 90-nonnan[0]) & (xx <= 90+nonnan[0]))
+            middle=np.nanmean(yy[gg])
+        else:
+            return np.nan
+        edges=np.nanmax(jj)*.97
+        if middle < edges:
+            return 1
+        else:
+            return 0
     else:
-        return 0
+        return np.nan
 def RMSEtest(yydata,yyfit):
     yyfit2=np.array(yyfit)
     yydata2=np.array(yydata)
